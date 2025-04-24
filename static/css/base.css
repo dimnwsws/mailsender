@@ -1,0 +1,87 @@
+/* Base CSS styles */
+:root {
+    --primary-color: #f07c38;
+    --primary-hover: #e06c28;
+    --primary-light: #ffece3;
+    --text-color: #333;
+    --text-light: #666;
+    --light-gray: #f7f7f7;
+    --border-color: #e0e0e0;
+    --white: #fff;
+    --header-bg: #f0f0f0;
+    --banner-bg: #e0e0e0;
+    --modal-overlay: rgba(0, 0, 0, 0.5);
+    --box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    --transition: all 0.3s ease;
+    --radius: 6px;
+    --success-color: #4caf50;
+    --warning-color: #ff9800;
+    --error-color: #f44336;
+}
+
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
+body {
+    font-family: 'Roboto', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    color: var(--text-color);
+    background-color: var(--light-gray);
+    line-height: 1.6;
+}
+
+button {
+    cursor: pointer;
+}
+
+input, select, textarea {
+    font-family: inherit;
+}
+
+/* Utility classes */
+.text-center {
+    text-align: center;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.flex {
+    display: flex;
+}
+
+.flex-col {
+    flex-direction: column;
+}
+
+.items-center {
+    align-items: center;
+}
+
+.justify-center {
+    justify-content: center;
+}
+
+.gap-10 {
+    gap: 10px;
+}
+
+.gap-20 {
+    gap: 20px;
+}
+
+.w-full {
+    width: 100%;
+}
+
+.relative {
+    position: relative;
+}
+
+.absolute {
+    position: absolute;
+}

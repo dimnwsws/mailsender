@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Просмотр Сертификатов</title>
+    
+    <!-- CSS файлы -->
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/components.css">
+    <link rel="stylesheet" href="css/table.css">
+    <link rel="stylesheet" href="css/modals.css">
+    <link rel="stylesheet" href="css/animations.css">
+    
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.2.2/css/buttons.dataTables.min.css">
+    <link rel="stylesheet" href="https://cdn.datatables.net/colreorder/1.5.6/css/colReorder.dataTables.min.css">
+    
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- jQuery и DataTables JS -->
+    <script src="https://code.jquery.com/jquery-3.5.1.js"></script>
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/buttons/2.2.2/js/dataTables.buttons.min.js"></script>
+    <script src="https://cdn.datatables.net/colreorder/1.5.6/js/dataTables.colReorder.min.js"></script>
+</head>
+<body>
+    <!-- Контейнер для уведомлений -->
+    <div class="toast-container"></div>
+    
+    <div class="app-container">
+        <!-- Боковая панель -->
+        <div class="sidebar">
+            <div class="logo">
+                <div class="logo-text">
+                    <span class="logo-top">Всероссийский</span>
+                    <span class="logo-middle">студенческий</span>
+                    <span class="logo-bottom">союз</span>
+                </div>
+            </div>
+            <div class="sidebar-buttons">
+                <button id="btn-mailing" class="sidebar-btn">Рассылка</button>
+                <button id="btn-view-db" class="sidebar-btn">Просмотр БД</button>
+            </div>
+        </div>
+
+        <!-- Основной контент -->
+        <div class="main-content">
+            <!-- Секция баннера -->
+            <div class="banner">
+                <div class="banner-overlay">
+                    <div class="banner-logo">C</div>
+                    <div class="help-icon" title="Помощь">?</div>
+                </div>
+            </div>
+
+            <!-- Секция таблицы -->
+            <div class="table-container">
+                <div class="table-toolbar">
+                    <div class="toolbar-left">
+                        <button id="btn-load-file" class="toolbar-btn">Загрузить файл</button>
+                        <button id="btn-export" class="toolbar-btn">Экспорт</button>
+                        <button id="btn-columns" class="toolbar-btn">Колонки</button>
+                        <button id="btn-custom-columns" class="toolbar-btn">Добавить колонку</button>
+                        <button id="btn-presets" class="toolbar-btn">Пресеты</button>
+                    </div>
+                    <div class="toolbar-right">
+                        <input type="text" id="global-search" placeholder="Поиск...">
+                    </div>
+                </div>
+                
+                <!-- Индикатор загрузки -->
+                <div id="loading-indicator" class="loading-indicator" style="display: none; opacity: 0; transition: opacity 0.3s ease;">
+                    <div class="spinner"></div>
+                    <p>Загрузка данных, пожалуйста подождите...</p>
+                </div>
+                
+                <!-- Пустое состояние, когда нет данных -->
+                <div id="empty-state" class="empty-state">
+                    <div style="font-size: 72px; margin-bottom: 20px;">📊</div>
+                    <h2>Данные не загружены</h2>
+                    <p>Загрузите файл, чтобы начать</p>
+                    <button id="btn-start-upload" class="upload-btn">Загрузить файл</button>
+                </div>
+                
+                <div class="table-wrapper">
+                    <table id="data-table" class="display" style="width:100%">
+                        <!-- Таблица будет заполнена с помощью JavaScript -->
+                        <thead>
+                            <tr>
+                                <!-- Заголовки будут созданы динамически -->
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Данные будут созданы динамически -->
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="status-bar" id="status-bar" style="opacity: 1; transition: opacity 0.3s ease;">
+                    Готово
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальные окна -->
+    <div id="column-selector-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Выбор колонок</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="search-container">
+                    <input type="text" id="column-search" placeholder="Поиск колонок...">
+                </div>
+                <div class="button-container">
+                    <button id="select-all-columns" class="modal-btn">Выбрать все</button>
+                    <button id="deselect-all-columns" class="modal-btn">Снять все</button>
+                </div>
+                <div class="column-list" id="column-list">
+                    <!-- Колонки будут добавлены динамически -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="apply-columns" class="modal-btn primary">Применить</button>
+                <button id="cancel-columns" class="modal-btn">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="filter-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="filter-column-name">Фильтр колонки</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="preset-container">
+                    <label>Пресеты:</label>
+                    <select id="filter-presets">
+                        <option value="">Выбрать пресет...</option>
+                    </select>
+                    <button id="apply-preset" class="modal-btn">Применить</button>
+                    <button id="save-preset" class="modal-btn">Сохранить как...</button>
+                </div>
+                <div class="search-container">
+                    <input type="text" id="filter-search" placeholder="Поиск значений...">
+                </div>
+                <div class="button-container">
+                    <button id="select-all-values" class="modal-btn">Выбрать все</button>
+                    <button id="deselect-all-values" class="modal-btn">Снять все</button>
+                </div>
+                <div class="value-list" id="value-list">
+                    <!-- Значения будут добавлены динамически -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="apply-filter" class="modal-btn primary">Применить</button>
+                <button id="cancel-filter" class="modal-btn">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="presets-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Управление пресетами</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="preset-selector">
+                    <label>Доступные пресеты:</label>
+                    <select id="preset-select">
+                        <!-- Пресеты будут добавлены динамически -->
+                    </select>
+                </div>
+                <div class="preset-buttons">
+                    <button id="apply-preset-btn" class="modal-btn">Применить</button>
+                    <button id="rename-preset-btn" class="modal-btn">Переименовать</button>
+                    <button id="delete-preset-btn" class="modal-btn">Удалить</button>
+                    <button id="save-preset-btn" class="modal-btn primary">Сохранить текущие настройки</button>
+                </div>
+                <div class="preset-info" id="preset-info" style="opacity: 1; transition: opacity 0.3s ease;">
+                    <!-- Информация о пресете будет показана здесь -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="close-presets" class="modal-btn">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="export-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Экспорт данных</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <p>Выберите формат экспорта:</p>
+                <div class="export-options">
+                    <button id="export-csv" class="export-btn">CSV</button>
+                    <button id="export-excel" class="export-btn">Excel</button>
+                    <button id="export-json" class="export-btn">JSON</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="cancel-export" class="modal-btn">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="custom-columns-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Пользовательские колонки</h2>
+                <span class="close">&times;</span>
+            </div>
+            <div class="modal-body">
+                <div class="custom-columns-form">
+                    <label for="custom-column-name">Название колонки:</label>
+                    <input type="text" id="custom-column-name" placeholder="Введите название новой колонки">
+                    
+                    <label for="custom-column-formula">Формула (используйте ${columnName} для ссылки на другие колонки):</label>
+                    <textarea id="custom-column-formula" rows="3" 
+                              placeholder="Пример: ${Имя} + ' ' + ${Фамилия} - для объединения имени и фамилии"></textarea>
+                    
+                    <button id="add-custom-column" class="modal-btn primary">Добавить колонку</button>
+                </div>
+                
+                <hr>
+                
+                <h3>Сохраненные колонки</h3>
+                <div class="saved-columns-list" id="saved-columns-list">
+                    <!-- Сохраненные колонки будут отображены здесь -->
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="close-custom-columns" class="modal-btn">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="file-input-container" style="display: none;">
+        <input type="file" id="file-input" accept=".csv,.xlsx,.xls,.xml,.pickle,.pkl,.pck,.pcl">
+    </div>
+
+    <!-- JavaScript файлы -->
+    <script src="js/state.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/ui.js"></script>
+    <script src="js/table.js"></script>
+    <script src="js/modals.js"></script>
+    <script src="js/presets.js"></script>
+    <script src="js/customColumns.js"></script>
+    <script src="js/app.js"></script>
+    
+    <script>
+        // Добавляем обработчики при загрузке страницы
+        document.addEventListener('DOMContentLoaded', function() {
+            // Кнопка загрузки в пустом состоянии
+            const btnStartUpload = document.getElementById('btn-start-upload');
+            if (btnStartUpload) {
+                btnStartUpload.addEventListener('click', function() {
+                    document.getElementById('file-input').click();
+                });
+            }
+            
+            // Дополнительные обработчики для гарантии работы кнопок
+            document.getElementById('btn-columns').addEventListener('click', function() {
+                initColumnSelectorModal();
+            });
+            
+            document.getElementById('btn-custom-columns').addEventListener('click', function() {
+                initCustomColumnsModal();
+            });
+            
+            document.getElementById('btn-presets').addEventListener('click', function() {
+                initPresetsModal();
+            });
+            
+            // Явная привязка закрытия модальных окон
+            document.querySelectorAll('.modal .close').forEach(function(closeBtn) {
+                closeBtn.addEventListener('click', function() {
+                    const modal = this.closest('.modal');
+                    if (modal) {
+                        closeModal(modal);
+                    }
+                });
+            });
+            
+            // Предотвращение отправки формы при нажатии Enter в полях поиска
+            document.querySelectorAll('input[type="text"]').forEach(function(input) {
+                input.addEventListener('keydown', function(e) {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                    }
+                });
+            });
+        });
+    </script>
+</body>
+</html>
