@@ -78,18 +78,44 @@ function initColumnSelectorModal() {
 function applyColumnSelection() {
     const checkboxes = modals.columnSelector.columnList.querySelectorAll('input[type="checkbox"]');
     const selectedColumns = [];
+    const visibleColumnNames = [];
     
     checkboxes.forEach(checkbox => {
         const columnIndex = parseInt(checkbox.value);
         if (checkbox.checked) {
             selectedColumns.push(columnIndex);
+            // Получаем имя колонки и добавляем в список видимых
+            const columnName = appState.dataTable.column(columnIndex).dataSrc();
+            visibleColumnNames.push(columnName);
             appState.dataTable.column(columnIndex).visible(true);
         } else {
             appState.dataTable.column(columnIndex).visible(false);
         }
     });
     
-    // Обновляем таблицу без перерисовки всей страницы
+    // Отладочный вывод
+    console.log("Видимые колонки:", visibleColumnNames);
+    
+    // Сохраняем видимые колонки в API для экспорта
+    if (appState.sessionId) {
+        fetchAPI(`/api/update_visible_columns/${appState.sessionId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                visible_columns: visibleColumnNames
+            })
+        })
+        .then(response => {
+            console.log("Колонки успешно сохранены на сервере:", response);
+        })
+        .catch(error => {
+            console.error('Ошибка сохранения видимых колонок:', error);
+        });
+    }
+    
+    // Обновляем таблицу с анимацией
     appState.dataTable.columns.adjust().draw(false);
     
     // Обновляем статусную строку
@@ -362,6 +388,32 @@ function initExportModal() {
         return;
     }
     
+    // Обновляем информацию перед открытием модального окна
+    if (appState.dataTable) {
+        let visibleCount = 0;
+        appState.dataTable.columns().every(function() {
+            if (this.visible()) visibleCount++;
+        });
+        
+        // Добавим небольшое информационное сообщение о количестве колонок
+        const exportInfo = document.getElementById('export-info');
+        if (exportInfo) {
+            exportInfo.textContent = `Будет экспортировано ${visibleCount} колонок`;
+        } else {
+            // Создаем элемент, если его нет
+            const infoElement = document.createElement('p');
+            infoElement.id = 'export-info';
+            infoElement.textContent = `Будет экспортировано ${visibleCount} колонок`;
+            infoElement.style.marginTop = '10px';
+            infoElement.style.textAlign = 'center';
+            infoElement.style.color = 'var(--text-light)';
+            
+            // Добавляем элемент в модальное окно
+            const modalBody = modals.export.modal.querySelector('.modal-body');
+            modalBody.appendChild(infoElement);
+        }
+    }
+    
     // Добавляем обработчики событий для закрытия
     modals.export.close.onclick = function() {
         closeModal(modals.export.modal);
@@ -397,30 +449,79 @@ function exportData(format) {
         return;
     }
     
-    // Показываем уведомление
-    showToast('info', 'Начало экспорта', `Подготовка экспорта в формате ${format.toUpperCase()}...`);
-    
-    // Создаем ссылку для скачивания файла
-    const link = document.createElement('a');
-    link.href = `/api/export/${appState.sessionId}?format=${format}`;
-    link.target = '_blank';
-    
-    // Добавляем ссылку в документ и кликаем по ней
-    document.body.appendChild(link);
-    link.click();
-    
-    // Удаляем ссылку
-    setTimeout(() => {
-        document.body.removeChild(link);
-    }, 100);
-    
-    // Закрываем модальное окно
-    closeModal(modals.export.modal);
-    
-    updateStatusBar(`Экспорт данных в формате ${format.toUpperCase()}...`);
-    
-    // Показываем уведомление после задержки (предполагаем, что загрузка началась)
-    setTimeout(() => {
-        showToast('success', 'Экспорт завершен', `Экспорт в формате ${format.toUpperCase()} готов для скачивания`);
-    }, 1500);
+    // Собираем видимые колонки перед экспортом
+    const visibleColumnNames = [];
+    if (appState.dataTable) {
+        appState.dataTable.columns().every(function(index) {
+            if (this.visible()) {
+                const columnName = this.dataSrc();
+                visibleColumnNames.push(columnName);
+            }
+        });
+
+        // Синхронизируем с сервером перед экспортом
+        fetchAPI(`/api/update_visible_columns/${appState.sessionId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                visible_columns: visibleColumnNames
+            })
+        }).then(() => {
+            console.log("Экспорт колонок:", visibleColumnNames);
+            
+            // Показываем уведомление
+            showToast('info', 'Начало экспорта', `Подготовка экспорта в формате ${format.toUpperCase()}...`);
+            
+            // Создаем ссылку для скачивания файла
+            const link = document.createElement('a');
+            link.href = `/api/export/${appState.sessionId}?format=${format}`;
+            link.target = '_blank';
+            
+            // Добавляем ссылку в документ и кликаем по ней
+            document.body.appendChild(link);
+            link.click();
+            
+            // Удаляем ссылку
+            setTimeout(() => {
+                document.body.removeChild(link);
+            }, 100);
+            
+            // Закрываем модальное окно
+            closeModal(modals.export.modal);
+            
+            updateStatusBar(`Экспорт данных в формате ${format.toUpperCase()}...`);
+            
+            // Показываем уведомление после задержки (предполагаем, что загрузка началась)
+            setTimeout(() => {
+                showToast('success', 'Экспорт завершен', `Экспорт в формате ${format.toUpperCase()} готов для скачивания`);
+            }, 1500);
+        }).catch(error => {
+            console.error("Ошибка сохранения видимых колонок перед экспортом:", error);
+            showToast('error', 'Ошибка экспорта', 'Не удалось подготовить данные для экспорта');
+        });
+    } else {
+        // Если DataTable не инициализирован, просто экспортируем всё
+        showToast('info', 'Начало экспорта', `Подготовка экспорта в формате ${format.toUpperCase()}...`);
+        
+        const link = document.createElement('a');
+        link.href = `/api/export/${appState.sessionId}?format=${format}`;
+        link.target = '_blank';
+        
+        document.body.appendChild(link);
+        link.click();
+        
+        setTimeout(() => {
+            document.body.removeChild(link);
+        }, 100);
+        
+        closeModal(modals.export.modal);
+        
+        updateStatusBar(`Экспорт данных в формате ${format.toUpperCase()}...`);
+        
+        setTimeout(() => {
+            showToast('success', 'Экспорт завершен', `Экспорт в формате ${format.toUpperCase()} готов для скачивания`);
+        }, 1500);
+    }
 }

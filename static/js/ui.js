@@ -14,6 +14,14 @@ function initEventListeners() {
     elements.btnViewDb.addEventListener('click', () => {
         loadFile();
     });
+
+    // Кнопка "Обновить базу данных"
+    const btnUpdateDb = document.getElementById('btn-update-db');
+    if (btnUpdateDb) {
+        btnUpdateDb.addEventListener('click', () => {
+            window.open('https://islod.obrnadzor.gov.ru/accredreestr/opendata/', '_blank');
+        });
+    }
     
     // Кнопки панели инструментов
     elements.btnLoadFile.addEventListener('click', () => {

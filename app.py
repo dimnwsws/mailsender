@@ -8,9 +8,66 @@ import uuid
 import xml.etree.ElementTree as ET
 import pickle
 from flask_cors import CORS  # Added CORS import
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, 
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__, static_folder='static')
 CORS(app)  # Enable CORS for all routes
+
+# Define column translations (English to Russian)
+column_translations = {
+    'IsFederal': 'Источник свидетельства',
+    'Id': 'Идентификатор свидетельства',
+    'StatusName': 'Текущий статус свидетельства',
+    'TypeName': 'Вид свидетельства',
+    'RegionName': 'Субъект РФ',
+    'RegionCode': 'Код Субъекта РФ',
+    'FederalDistrictName': 'Субъект РФ',
+    'FederalDistrictShortName': 'Сокращенное наименование Субъекта РФ',
+    'RegNumber': 'Регистрационный номер',
+    'SerialNumber': 'Серия бланка',
+    'FormNumber': 'Номер бланка',
+    'IssueDate': 'Дата выдачи свидетельства',
+    'EndDate': 'Срок действия свидетельства',
+    'ControlOrgan': 'Орган, выдавший свидетельство',
+    'PostAddress': 'Юридический адрес организации',
+    'EduOrgFullName': 'Полное наименование организации',
+    'EduOrgShortName': 'Сокращенное наименование',
+    'EduOrgINN': 'ИНН',
+    'EduOrgKPP': 'КПП',
+    'EduOrgOGRN': 'ОГРН',
+    'IndividualEntrepreneurLastName': 'Фамилия индивидуального предпринимателя',
+    'IndividualEntrepreneurFirstName': 'Имя индивидуального предпринимателя',
+    'IndividualEntrepreneurMiddleName': 'Отчество индивидуального предпринимателя',
+    'IndividualEntrepreneurAddress': 'Юридический адрес индивидуального предпринимателя',
+    'IndividualEntrepreneurEGRIP': 'ОГРН индивидуального предпринимателя',
+    'IndividualEntrepreneurINN': 'ИНН индивидуального предпринимателя',
+    'EduOrg_Id': 'Идентификатор образовательной организации',
+    'EduOrg_FullName': 'Полное наименование',
+    'EduOrg_ShortName': 'Сокращенное наименование',
+    'EduOrg_HeadEduOrgId': 'Головная организация',
+    'EduOrg_IsBranch': 'Является филиалом',
+    'EduOrg_PostAddress': 'Юридический адрес организации',
+    'EduOrg_Phone': 'Телефон организации',
+    'EduOrg_Fax': 'Факс',
+    'EduOrg_Email': 'Адрес электронной почты организации',
+    'EduOrg_WebSite': 'Веб-сайт организации',
+    'EduOrg_OGRN': 'ОГРН',
+    'EduOrg_INN': 'ИНН',
+    'EduOrg_KPP': 'КПП',
+    'EduOrg_HeadPost': 'Должность руководителя',
+    'EduOrg_HeadName': 'ФИО руководителя',
+    'EduOrg_FormName': 'Организационно правовая форма',
+    'EduOrg_KindName': 'Вид организации',
+    'EduOrg_TypeName': 'Тип орагнизации',
+    'EduOrg_RegionName': 'Субъект РФ',
+    'EduOrg_FederalDistrictShortName': 'Сокращенное наименование Федерального округа',
+    'EduOrg_FederalDistrictName': 'Полное наименование Федерального округа'
+}
 
 # Store data in memory (in a real app, you might use a database)
 sessions = {}
@@ -92,6 +149,11 @@ def upload_file():
         else:
             return jsonify({'error': 'Неподдерживаемый формат файла'}), 400
         
+        # Translate column names
+        logger.info(f"Original columns: {list(df.columns)}")
+        df = translate_column_names(df)
+        logger.info(f"Translated columns: {list(df.columns)}")
+        
         # Convert DataFrame to JSON
         data = df.replace({np.nan: None}).to_dict('records')
         
@@ -100,7 +162,8 @@ def upload_file():
             'data': data,
             'file_path': file_path,
             'filename': file.filename,
-            'filters': []
+            'filters': [],
+            'visible_columns': list(df.columns)  # Initialize with all columns visible
         }
         
         # Return basic info and the first 1000 records (for large files)
@@ -112,7 +175,20 @@ def upload_file():
         })
     
     except Exception as e:
+        logger.error(f"Error in upload: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
+
+def translate_column_names(df):
+    """Translate column names from English to Russian"""
+    translated_columns = {}
+    for col in df.columns:
+        if col in column_translations:
+            translated_columns[col] = column_translations[col]
+        else:
+            translated_columns[col] = col
+    
+    df = df.rename(columns=translated_columns)
+    return df
 
 @app.route('/api/data/<session_id>', methods=['GET'])
 def get_data(session_id):
@@ -159,6 +235,7 @@ def get_data(session_id):
             'draw': int(request.args.get('draw', 1))  # Important for DataTables
         })
     except Exception as e:
+        logger.error(f"Error in get_data: {str(e)}", exc_info=True)
         return jsonify({'error': str(e), 'data': []}), 500
 
 @app.route('/api/filter/<session_id>', methods=['POST'])
@@ -191,6 +268,36 @@ def apply_filter(session_id):
             'filtered_rows': len(filtered_data)
         })
     except Exception as e:
+        logger.error(f"Error in apply_filter: {str(e)}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/update_visible_columns/<session_id>', methods=['POST'])
+def update_visible_columns(session_id):
+    """Update visible columns for a session"""
+    if session_id not in sessions:
+        return jsonify({'error': 'Сессия не найдена'}), 404
+    
+    data = request.json
+    
+    if not data or 'visible_columns' not in data:
+        return jsonify({'error': 'Недопустимые данные'}), 400
+    
+    try:
+        # Log received data
+        logger.info(f"Updating visible columns for session {session_id}")
+        logger.info(f"Received visible columns: {data['visible_columns']}")
+        
+        # Update visible columns
+        sessions[session_id]['visible_columns'] = data['visible_columns']
+        
+        # Verify the update
+        logger.info(f"Updated visible columns in session: {sessions[session_id]['visible_columns']}")
+        
+        return jsonify({
+            'success': True
+        })
+    except Exception as e:
+        logger.error(f"Error in update_visible_columns: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/export/<session_id>', methods=['GET'])
@@ -205,14 +312,52 @@ def export_data(session_id):
         # Get data with any active filters
         data = sessions[session_id]['data']
         
+        # Log debug info
+        logger.info(f"Export requested for session {session_id}")
+        logger.info(f"Export format: {export_format}")
+        
+        # Check if visible_columns exists in the session
+        if 'visible_columns' in sessions[session_id]:
+            visible_columns = sessions[session_id]['visible_columns']
+            logger.info(f"Found visible_columns in session: {visible_columns}")
+        else:
+            visible_columns = []
+            logger.info("No visible_columns found in session, using all columns")
+        
+        # Apply filters if any
         if 'filters' in sessions[session_id] and sessions[session_id]['filters']:
-            for filter_info in sessions[session_id]['filters']:
-                column = filter_info['column']
-                values = filter_info['values']
-                data = [row for row in data if row.get(column) in values]
+            logger.info(f"Applying filters: {sessions[session_id]['filters']}")
+            filtered_data = []
+            for row in data:
+                include_row = True
+                for filter_info in sessions[session_id]['filters']:
+                    column = filter_info['column']
+                    values = filter_info['values']
+                    if row.get(column) not in values:
+                        include_row = False
+                        break
+                if include_row:
+                    filtered_data.append(row)
+            data = filtered_data
+            logger.info(f"After filtering: {len(data)} rows")
         
         # Convert to DataFrame
         df = pd.DataFrame(data)
+        logger.info(f"DataFrame created with columns: {list(df.columns)}")
+        
+        # Filter only visible columns if specified
+        if visible_columns and len(visible_columns) > 0:
+            # Keep only columns that exist in the DataFrame
+            valid_columns = [col for col in visible_columns if col in df.columns]
+            logger.info(f"Valid visible columns: {valid_columns}")
+            
+            if valid_columns:  # Only filter if we have valid columns
+                df = df[valid_columns]
+                logger.info(f"DataFrame filtered to columns: {list(df.columns)}")
+            else:
+                logger.info("No valid visible columns found, using all columns")
+        else:
+            logger.info("No visible columns specified, using all columns")
         
         # Create temporary file for export
         temp_dir = tempfile.gettempdir()
@@ -233,6 +378,8 @@ def export_data(session_id):
         else:
             return jsonify({'error': 'Неподдерживаемый формат экспорта'}), 400
         
+        logger.info(f"Export file created: {output_file}")
+        
         return send_from_directory(
             directory=temp_dir,
             path=os.path.basename(output_file),
@@ -241,6 +388,7 @@ def export_data(session_id):
             download_name=os.path.basename(output_file)
         )
     except Exception as e:
+        logger.error(f"Export error: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/update/<session_id>', methods=['POST'])
@@ -263,6 +411,7 @@ def update_cell(session_id):
         sessions[session_id]['data'][row_index][column] = value
         return jsonify({'success': True})
     except Exception as e:
+        logger.error(f"Error in update_cell: {str(e)}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/presets', methods=['GET', 'POST'])
@@ -281,6 +430,7 @@ def manage_presets():
             else:
                 return jsonify([])
         except Exception as e:
+            logger.error(f"Error in manage_presets GET: {str(e)}", exc_info=True)
             return jsonify({'error': str(e)}), 500
     
     elif request.method == 'POST':
@@ -290,6 +440,7 @@ def manage_presets():
                 json.dump(presets, f)
             return jsonify({'success': True})
         except Exception as e:
+            logger.error(f"Error in manage_presets POST: {str(e)}", exc_info=True)
             return jsonify({'error': str(e)}), 500
 
 # Start the application

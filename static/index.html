@@ -44,6 +44,7 @@
             <div class="sidebar-buttons">
                 <button id="btn-mailing" class="sidebar-btn">Рассылка</button>
                 <button id="btn-view-db" class="sidebar-btn">Просмотр БД</button>
+                <button id="btn-update-db" class="sidebar-btn">Обновить базу данных</button>
             </div>
         </div>
 
@@ -208,12 +209,15 @@
                     <button id="export-excel" class="export-btn">Excel</button>
                     <button id="export-json" class="export-btn">JSON</button>
                 </div>
+                <p id="export-info" style="margin-top: 15px; text-align: center; color: var(--text-light);">
+                    Будет экспортировано только видимые колонки
+                </p>
             </div>
             <div class="modal-footer">
                 <button id="cancel-export" class="modal-btn">Отмена</button>
             </div>
         </div>
-    </div>
+    </div>  
 
     <div id="custom-columns-modal" class="modal">
         <div class="modal-content">
@@ -282,6 +286,11 @@
             
             document.getElementById('btn-presets').addEventListener('click', function() {
                 initPresetsModal();
+            });
+
+            // Обработчик для кнопки "Обновить базу данных"
+            document.getElementById('btn-update-db').addEventListener('click', function() {
+                window.open('https://islod.obrnadzor.gov.ru/accredreestr/opendata/', '_blank');
             });
             
             // Явная привязка закрытия модальных окон

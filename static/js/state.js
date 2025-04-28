@@ -21,6 +21,7 @@ const elements = {
     // Боковая панель
     btnMailing: document.getElementById('btn-mailing'),
     btnViewDb: document.getElementById('btn-view-db'),
+    btnUpdateDb: document.getElementById('btn-update-db'),
     
     // Панель инструментов
     btnLoadFile: document.getElementById('btn-load-file'),
