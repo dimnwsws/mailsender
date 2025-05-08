@@ -254,64 +254,14 @@
         <input type="file" id="file-input" accept=".csv,.xlsx,.xls,.xml,.pickle,.pkl,.pck,.pcl">
     </div>
 
-    <!-- JavaScript файлы -->
+    <!-- JavaScript файлы в правильном порядке загрузки -->
     <script src="js/state.js"></script>
     <script src="js/utils.js"></script>
-    <script src="js/ui.js"></script>
     <script src="js/table.js"></script>
     <script src="js/modals.js"></script>
     <script src="js/presets.js"></script>
     <script src="js/customColumns.js"></script>
+    <script src="js/ui.js"></script>
     <script src="js/app.js"></script>
-    
-    <script>
-        // Добавляем обработчики при загрузке страницы
-        document.addEventListener('DOMContentLoaded', function() {
-            // Кнопка загрузки в пустом состоянии
-            const btnStartUpload = document.getElementById('btn-start-upload');
-            if (btnStartUpload) {
-                btnStartUpload.addEventListener('click', function() {
-                    document.getElementById('file-input').click();
-                });
-            }
-            
-            // Дополнительные обработчики для гарантии работы кнопок
-            document.getElementById('btn-columns').addEventListener('click', function() {
-                initColumnSelectorModal();
-            });
-            
-            document.getElementById('btn-custom-columns').addEventListener('click', function() {
-                initCustomColumnsModal();
-            });
-            
-            document.getElementById('btn-presets').addEventListener('click', function() {
-                initPresetsModal();
-            });
-
-            // Обработчик для кнопки "Обновить базу данных"
-            document.getElementById('btn-update-db').addEventListener('click', function() {
-                window.open('https://islod.obrnadzor.gov.ru/accredreestr/opendata/', '_blank');
-            });
-            
-            // Явная привязка закрытия модальных окон
-            document.querySelectorAll('.modal .close').forEach(function(closeBtn) {
-                closeBtn.addEventListener('click', function() {
-                    const modal = this.closest('.modal');
-                    if (modal) {
-                        closeModal(modal);
-                    }
-                });
-            });
-            
-            // Предотвращение отправки формы при нажатии Enter в полях поиска
-            document.querySelectorAll('input[type="text"]').forEach(function(input) {
-                input.addEventListener('keydown', function(e) {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                    }
-                });
-            });
-        });
-    </script>
 </body>
 </html>

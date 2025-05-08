@@ -2,10 +2,16 @@
  * Вспомогательные функции
  */
 
-// Создаем контейнер для уведомлений
-const toastContainer = document.createElement('div');
-toastContainer.className = 'toast-container';
-document.body.appendChild(toastContainer);
+// Получаем или создаем контейнер для уведомлений
+function getToastContainer() {
+    let toastContainer = document.querySelector('.toast-container');
+    if (!toastContainer) {
+        toastContainer = document.createElement('div');
+        toastContainer.className = 'toast-container';
+        document.body.appendChild(toastContainer);
+    }
+    return toastContainer;
+}
 
 /**
  * Показать уведомление
@@ -16,6 +22,7 @@ document.body.appendChild(toastContainer);
  * @returns {HTMLElement} - Элемент уведомления
  */
 function showToast(type, title, message, duration = 3000) {
+    const toastContainer = getToastContainer();
     const toast = document.createElement('div');
     toast.className = `toast ${type}`;
     
@@ -64,6 +71,8 @@ function showToast(type, title, message, duration = 3000) {
  * Показать индикатор загрузки с анимацией
  */
 function showLoading() {
+    if (!elements.loadingIndicator) return;
+    
     appState.isLoading = true;
     elements.loadingIndicator.style.display = 'flex';
     
@@ -77,6 +86,8 @@ function showLoading() {
  * Скрыть индикатор загрузки с анимацией
  */
 function hideLoading() {
+    if (!elements.loadingIndicator) return;
+    
     elements.loadingIndicator.style.opacity = '0';
     
     // Ждем окончания анимации
@@ -91,6 +102,8 @@ function hideLoading() {
  * @param {string} message - Новый текст для статусной строки
  */
 function updateStatusBar(message) {
+    if (!elements.statusBar) return;
+    
     // Исчезание
     elements.statusBar.style.opacity = '0';
     
@@ -107,6 +120,8 @@ function updateStatusBar(message) {
  * @param {HTMLElement} modal - Элемент модального окна
  */
 function openModal(modal) {
+    if (!modal) return;
+    
     modal.style.display = 'flex';
     // Форсируем перерисовку для включения анимации
     modal.offsetHeight;
@@ -118,6 +133,8 @@ function openModal(modal) {
  * @param {HTMLElement} modal - Элемент модального окна
  */
 function closeModal(modal) {
+    if (!modal) return;
+    
     modal.classList.remove('show');
     // Ждем окончания анимации
     setTimeout(() => {
@@ -212,6 +229,8 @@ function showEmptyState() {
  * Добавить улучшенный поиск для верхнего поля
  */
 function enhanceSearchInput() {
+    if (!elements.globalSearch) return;
+    
     const $search = $(elements.globalSearch);
     const $container = $search.parent();
     

@@ -85,7 +85,7 @@ def parse_large_xml(xml_file):
     for event, elem in context:
         if event == "end" and elem.tag == "Certificate":
             # Extract top-level fields from Certificate
-            cert_info = {field.tag: field.text for field in elem if field.tag not in ["ActualEducationOrganization", "Supplements", "Decisions"]}
+            cert_info = {field.tag: field.text for field in elem}
             
             # Extract ActualEducationOrganization fields
             edu_org = elem.find("ActualEducationOrganization")

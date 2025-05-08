@@ -6,6 +6,11 @@
  * Инициализировать модальное окно выбора колонок
  */
 function initColumnSelectorModal() {
+    if (!modals.columnSelector || !modals.columnSelector.modal) {
+        console.error('Modal elements not initialized');
+        return;
+    }
+
     if (!appState.sessionId) {
         showToast('warning', 'Нет данных', 'Сначала загрузите файл');
         return;
@@ -73,9 +78,47 @@ function initColumnSelectorModal() {
 }
 
 /**
+ * Выбрать все колонки
+ * @param {boolean} select - true выбрать все, false снять выбор со всех
+ */
+function selectAllColumns(select) {
+    if (!modals.columnSelector || !modals.columnSelector.columnList) return;
+    
+    const checkboxes = modals.columnSelector.columnList.querySelectorAll('input[type="checkbox"]');
+    checkboxes.forEach(checkbox => {
+        if (checkbox.parentElement.style.display !== 'none') {
+            checkbox.checked = select;
+        }
+    });
+}
+
+/**
+ * Фильтровать колонки в модальном окне
+ * @param {string} searchText - Текст для поиска
+ */
+function filterColumns(searchText) {
+    if (!modals.columnSelector || !modals.columnSelector.columnList) return;
+    
+    const labels = modals.columnSelector.columnList.querySelectorAll('label');
+    const searchLower = searchText.toLowerCase();
+    
+    labels.forEach(label => {
+        const columnName = label.textContent.toLowerCase();
+        if (columnName.includes(searchLower)) {
+            label.style.display = '';
+        } else {
+            label.style.display = 'none';
+        }
+    });
+}
+
+/**
  * Применить выбор колонок
  */
 function applyColumnSelection() {
+    if (!modals.columnSelector || !modals.columnSelector.columnList) return;
+    if (!appState.dataTable) return;
+    
     const checkboxes = modals.columnSelector.columnList.querySelectorAll('input[type="checkbox"]');
     const selectedColumns = [];
     const visibleColumnNames = [];
@@ -135,6 +178,11 @@ function applyColumnSelection() {
  * @param {number} columnIndex - Индекс колонки для фильтрации
  */
 async function initFilterModal(columnIndex) {
+    if (!modals.filter || !modals.filter.modal) {
+        console.error('Filter modal elements not initialized');
+        return;
+    }
+
     if (!appState.sessionId) {
         showToast('warning', 'Нет данных', 'Сначала загрузите файл');
         return;
@@ -156,11 +204,15 @@ async function initFilterModal(columnIndex) {
         const response = await fetchAPI(`/api/data/${appState.sessionId}?length=-1`);
         const data = response.data;
         
-        // Получаем уникальные значения из колонки
-        const uniqueValues = [...new Set(data.map(row => row[columnName]))];
+        // Получаем уникальные значения из колонки и сортируем их
+        let uniqueValues = [...new Set(data.map(row => row[columnName]))];
         
         // Очищаем предыдущее содержимое
         modals.filter.valueList.innerHTML = '';
+        
+        // Проверяем, есть ли существующий фильтр для этой колонки
+        const existingFilter = appState.activeFilters.find(filter => filter.column === columnName);
+        const selectedValues = existingFilter ? existingFilter.values : uniqueValues;
         
         // Добавляем чекбоксы для каждого значения с анимацией
         uniqueValues.forEach((value, index) => {
@@ -173,7 +225,11 @@ async function initFilterModal(columnIndex) {
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.value = value === null ? 'null' : value;
-            checkbox.checked = true; // По умолчанию все отмечены
+            
+            // Если есть существующий фильтр, отмечаем только выбранные значения
+            checkbox.checked = existingFilter 
+                ? selectedValues.includes(value)
+                : true; // По умолчанию все отмечены, если нет фильтра
             
             label.appendChild(checkbox);
             label.appendChild(document.createTextNode(displayValue));
@@ -248,6 +304,8 @@ async function initFilterModal(columnIndex) {
  * Применить фильтр
  */
 async function applyFilter() {
+    if (!modals.filter || !modals.filter.valueList) return;
+    
     const checkboxes = modals.filter.valueList.querySelectorAll('input[type="checkbox"]');
     const selectedValues = [];
     
@@ -261,6 +319,12 @@ async function applyFilter() {
             selectedValues.push(value);
         }
     });
+    
+    // Проверяем, что есть выбранные значения
+    if (selectedValues.length === 0) {
+        showToast('warning', 'Пустой фильтр', 'Необходимо выбрать хотя бы одно значение');
+        return;
+    }
     
     // Обновляем активные фильтры
     const columnName = appState.currentColumnName;
@@ -303,7 +367,9 @@ async function applyFilter() {
             });
             
             // После перезагрузки данных применяем пользовательские колонки
-            applyCustomColumnsToTable();
+            if (typeof applyCustomColumnsToTable === 'function') {
+                applyCustomColumnsToTable();
+            }
         });
         
         // Обновляем статусную строку
@@ -328,11 +394,14 @@ async function applyFilter() {
  * @param {string} searchText - Текст для поиска
  */
 function filterValues(searchText) {
+    if (!modals.filter || !modals.filter.valueList) return;
+    
     const labels = modals.filter.valueList.querySelectorAll('label');
+    const searchLower = searchText.toLowerCase();
     
     labels.forEach(label => {
         const valueName = label.textContent.toLowerCase();
-        if (valueName.includes(searchText.toLowerCase())) {
+        if (valueName.includes(searchLower)) {
             label.style.display = '';
             // Анимируем элементы, которые совпадают
             label.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
@@ -361,6 +430,8 @@ function filterValues(searchText) {
  * @param {boolean} select - true для выбора всех, false для снятия выбора
  */
 function selectAllValues(select) {
+    if (!modals.filter || !modals.filter.valueList) return;
+    
     const checkboxes = modals.filter.valueList.querySelectorAll('input[type="checkbox"]');
     checkboxes.forEach(checkbox => {
         if (checkbox.parentElement.style.display !== 'none') {
@@ -383,6 +454,8 @@ function selectAllValues(select) {
  * Инициализировать модальное окно экспорта
  */
 function initExportModal() {
+    if (!modals.export || !modals.export.modal) return;
+    
     if (!appState.sessionId) {
         showToast('warning', 'Нет данных', 'Сначала загрузите файл');
         return;
@@ -410,7 +483,9 @@ function initExportModal() {
             
             // Добавляем элемент в модальное окно
             const modalBody = modals.export.modal.querySelector('.modal-body');
-            modalBody.appendChild(infoElement);
+            if (modalBody) {
+                modalBody.appendChild(infoElement);
+            }
         }
     }
     

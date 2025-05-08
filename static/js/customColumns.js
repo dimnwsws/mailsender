@@ -10,6 +10,8 @@ function loadCustomColumns() {
         const saved = localStorage.getItem('customColumns');
         if (saved) {
             appState.customColumns = JSON.parse(saved);
+        } else {
+            appState.customColumns = [];
         }
     } catch (error) {
         console.error('Ошибка загрузки пользовательских колонок:', error);
@@ -89,7 +91,8 @@ function removeCustomColumn(name) {
             // Найти индекс колонки по названию
             let colIdx = -1;
             appState.dataTable.columns().every(function(idx) {
-                if (this.header().textContent.replace('▼', '').trim() === name) {
+                const headerText = this.header().textContent;
+                if (headerText && headerText.replace('▼', '').trim() === name) {
                     colIdx = idx;
                     return false; // Прерываем цикл
                 }
@@ -97,9 +100,15 @@ function removeCustomColumn(name) {
             });
             
             if (colIdx >= 0) {
-                appState.dataTable.column(colIdx).visible(false);
-                appState.dataTable.column(colIdx).remove();
-                appState.dataTable.columns.adjust().draw();
+                // Проверяем, что метод visible и remove существуют
+                if (appState.dataTable.column(colIdx).visible && 
+                    appState.dataTable.column(colIdx).remove) {
+                    // Сначала делаем колонку невидимой
+                    appState.dataTable.column(colIdx).visible(false);
+                    // Затем удаляем колонку (если поддерживается)
+                    appState.dataTable.column(colIdx).remove();
+                    appState.dataTable.columns.adjust().draw();
+                }
             }
         } catch (e) {
             console.error('Ошибка при удалении колонки из таблицы:', e);
@@ -140,6 +149,8 @@ function calculateCustomColumnValue(formula, rowData) {
             // Заменяем в формуле с корректной обработкой строковых значений
             if (typeof value === 'string') {
                 calculatedFormula = calculatedFormula.replace(ref, JSON.stringify(value));
+            } else if (value === null) {
+                calculatedFormula = calculatedFormula.replace(ref, 'null');
             } else {
                 calculatedFormula = calculatedFormula.replace(ref, value);
             }
@@ -176,6 +187,12 @@ function applyCustomColumnsToTable() {
     let currentData = [];
     try {
         currentData = appState.dataTable.data().toArray();
+        
+        // Проверка, что currentData - массив объектов
+        if (!Array.isArray(currentData) || currentData.length === 0) {
+            console.error("Ошибка: данные не доступны или не являются массивом");
+            return;
+        }
     } catch (e) {
         console.error("Ошибка получения данных из таблицы:", e);
         // Если данные недоступны, запросим их заново с сервера
@@ -186,27 +203,31 @@ function applyCustomColumnsToTable() {
     }
     
     // Для каждой пользовательской колонки
-    appState.customColumns.forEach(customCol => {
+    for (const customCol of appState.customColumns) {
         console.log(`Обработка колонки: ${customCol.name}`);
         
         // Вычисляем значения для каждой строки
-        currentData.forEach((row, idx) => {
+        for (let idx = 0; idx < currentData.length; idx++) {
             try {
+                const row = currentData[idx];
                 row[customCol.name] = calculateCustomColumnValue(customCol.formula, row);
-                console.log(`Строка ${idx}, результат:`, row[customCol.name]);
             } catch (e) {
                 console.error(`Ошибка вычисления строки ${idx}:`, e);
-                row[customCol.name] = 'Ошибка';
+                currentData[idx][customCol.name] = 'Ошибка';
             }
-        });
+        }
         
         // Проверяем, существует ли колонка
         let columnExists = false;
         try {
             appState.dataTable.columns().every(function(idx) {
-                if (this.header().textContent.replace('▼', '').trim() === customCol.name) {
-                    columnExists = true;
-                    return false; // Прерываем цикл
+                const header = this.header();
+                if (header && header.textContent) {
+                    const headerText = header.textContent.replace('▼', '').trim();
+                    if (headerText === customCol.name) {
+                        columnExists = true;
+                        return false; // Прерываем цикл
+                    }
                 }
                 return true; // Продолжаем цикл
             });
@@ -218,26 +239,48 @@ function applyCustomColumnsToTable() {
         console.log(`Колонка ${customCol.name} существует: ${columnExists}`);
         
         if (!columnExists) {
-            // Добавляем колонку в таблицу
-            try {
-                appState.dataTable.column.add({
-                    title: customCol.name,
-                    data: customCol.name,
-                    name: customCol.name,
-                    orderable: true,
-                    defaultContent: "Н/Д"
-                }).draw();
-                console.log(`Колонка ${customCol.name} добавлена`);
-            } catch (e) {
-                console.error(`Ошибка добавления колонки ${customCol.name}:`, e);
+            // Проверяем, есть ли функция для добавления колонки
+            if (typeof appState.dataTable.column === 'object' && 
+                typeof appState.dataTable.column.add === 'function') {
+                try {
+                    // Добавляем колонку в таблицу
+                    appState.dataTable.column.add({
+                        title: customCol.name,
+                        data: customCol.name,
+                        name: customCol.name,
+                        orderable: true,
+                        defaultContent: "Н/Д"
+                    }).draw();
+                    console.log(`Колонка ${customCol.name} добавлена`);
+                } catch (e) {
+                    console.error(`Ошибка добавления колонки ${customCol.name}:`, e);
+                }
+            } else {
+                console.error("Метод column.add не доступен в DataTable");
             }
         }
-    });
+    }
     
     // Обновляем данные в таблице
     try {
-        appState.dataTable.clear().rows.add(currentData).draw();
-        console.log("Таблица обновлена с новыми данными");
+        // Проверяем, есть ли данные для обновления
+        if (currentData.length > 0) {
+            // Проверяем, что метод clear доступен
+            if (typeof appState.dataTable.clear === 'function') {
+                appState.dataTable.clear();
+            }
+            
+            // Проверяем, что метод rows.add доступен
+            if (typeof appState.dataTable.rows === 'object' && 
+                typeof appState.dataTable.rows.add === 'function') {
+                appState.dataTable.rows.add(currentData).draw();
+                console.log("Таблица обновлена с новыми данными");
+            } else {
+                console.error("Метод rows.add не доступен в DataTable");
+            }
+        } else {
+            console.error("Нет данных для обновления таблицы");
+        }
     } catch (e) {
         console.error("Ошибка при обновлении данных таблицы:", e);
     }
@@ -252,6 +295,11 @@ function applyCustomColumnsToTable() {
 function initCustomColumnsModal() {
     console.log("Инициализация модального окна пользовательских колонок");
     
+    if (!modals.customColumns || !modals.customColumns.modal) {
+        console.error("Модальное окно пользовательских колонок не инициализировано");
+        return;
+    }
+    
     // Очищаем форму
     modals.customColumns.columnName.value = '';
     modals.customColumns.columnFormula.value = '';
@@ -259,22 +307,25 @@ function initCustomColumnsModal() {
     // Обновляем список сохраненных колонок
     modals.customColumns.columnsList.innerHTML = '';
     
-    appState.customColumns.forEach(col => {
-        const item = document.createElement('div');
-        item.className = 'saved-column-item';
-        
-        item.innerHTML = `
-            <div class="saved-column-info">
-                <div class="saved-column-name">${col.name}</div>
-                <div class="saved-column-formula">${col.formula}</div>
-            </div>
-            <div class="saved-column-actions">
-                <button class="btn-remove-column" data-column="${col.name}">✕</button>
-            </div>
-        `;
-        
-        modals.customColumns.columnsList.appendChild(item);
-    });
+    // Добавляем сохраненные колонки с проверкой
+    if (Array.isArray(appState.customColumns)) {
+        appState.customColumns.forEach(col => {
+            const item = document.createElement('div');
+            item.className = 'saved-column-item';
+            
+            item.innerHTML = `
+                <div class="saved-column-info">
+                    <div class="saved-column-name">${col.name}</div>
+                    <div class="saved-column-formula">${col.formula}</div>
+                </div>
+                <div class="saved-column-actions">
+                    <button class="btn-remove-column" data-column="${col.name}">✕</button>
+                </div>
+            `;
+            
+            modals.customColumns.columnsList.appendChild(item);
+        });
+    }
     
     // Добавляем обработчики для закрытия
     modals.customColumns.close.onclick = function() {

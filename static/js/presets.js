@@ -9,9 +9,12 @@
 async function loadFilterPresets() {
     try {
         const presets = await fetchAPI('/api/presets');
-        appState.filterPresets = presets;
+        
+        // Убедимся, что presets - это массив
+        appState.filterPresets = Array.isArray(presets) ? presets : [];
+        
         updateStatusBar(`Загружено ${appState.filterPresets.length} пресетов фильтров`);
-        return presets;
+        return appState.filterPresets;
     } catch (error) {
         console.error('Ошибка загрузки пресетов:', error);
         appState.filterPresets = [];
@@ -23,6 +26,11 @@ async function loadFilterPresets() {
  * Сохранить пресеты фильтров на сервер API
  */
 async function saveFilterPresets() {
+    if (!Array.isArray(appState.filterPresets)) {
+        console.error('filterPresets не является массивом');
+        return;
+    }
+    
     try {
         await fetchAPI('/api/presets', {
             method: 'POST',
@@ -44,6 +52,12 @@ async function saveFilterPresets() {
  * Сохранить текущий фильтр как пресет
  */
 function saveFilterPreset() {
+    // Проверяем, инициализирован ли модальный объект фильтра
+    if (!modals.filter || !modals.filter.valueList) {
+        console.error('Модальное окно фильтра не инициализировано');
+        return;
+    }
+    
     const name = prompt('Введите имя для этого пресета:');
     if (!name) return;
     
@@ -61,12 +75,24 @@ function saveFilterPreset() {
         }
     });
     
+    // Проверяем, есть ли выбранные значения
+    if (selectedValues.length === 0) {
+        showToast('warning', 'Нет выбранных значений', 'Выберите хотя бы одно значение для создания пресета');
+        return;
+    }
+    
     // Создаем новый пресет
     const preset = {
         name: name,
         columnFilters: [],
         visibleColumns: []
     };
+    
+    // Проверяем, определено ли имя текущей колонки
+    if (!appState.currentColumnName) {
+        showToast('error', 'Ошибка', 'Имя текущей колонки не определено');
+        return;
+    }
     
     // Добавляем текущий фильтр колонки
     preset.columnFilters.push({
@@ -75,31 +101,47 @@ function saveFilterPreset() {
     });
     
     // Добавляем другие активные фильтры
-    appState.activeFilters.forEach(filter => {
-        if (filter.column !== appState.currentColumnName) {
-            preset.columnFilters.push({
-                column: filter.column,
-                values: filter.values
-            });
-        }
-    });
+    if (Array.isArray(appState.activeFilters)) {
+        appState.activeFilters.forEach(filter => {
+            if (filter.column !== appState.currentColumnName) {
+                preset.columnFilters.push({
+                    column: filter.column,
+                    values: filter.values
+                });
+            }
+        });
+    }
     
-    // Добавляем видимые колонки
-    const visibleColumnIndexes = appState.dataTable.columns().visible().toArray();
-    appState.dataTable.columns().header().toArray().forEach((header, index) => {
-        if (visibleColumnIndexes.includes(index)) {
-            const columnName = header.textContent.replace('▼', '').trim();
-            preset.visibleColumns.push(columnName);
-        }
-    });
+    // Добавляем видимые колонки, если DataTable инициализирована
+    if (appState.dataTable) {
+        const visibleColumnIndexes = appState.dataTable.columns().visible().toArray();
+        appState.dataTable.columns().header().toArray().forEach((header, index) => {
+            if (!header) return;
+            
+            if (visibleColumnIndexes.includes(index)) {
+                const columnName = header.textContent?.replace('▼', '').trim() || '';
+                if (columnName) {
+                    preset.visibleColumns.push(columnName);
+                }
+            }
+        });
+    }
     
     // Добавляем пользовательские колонки
-    preset.customColumns = appState.customColumns.map(col => ({
-        name: col.name,
-        formula: col.formula
-    }));
+    if (Array.isArray(appState.customColumns)) {
+        preset.customColumns = appState.customColumns.map(col => ({
+            name: col.name,
+            formula: col.formula
+        }));
+    } else {
+        preset.customColumns = [];
+    }
     
     // Проверяем, существует ли пресет с таким именем
+    if (!Array.isArray(appState.filterPresets)) {
+        appState.filterPresets = [];
+    }
+    
     const existingPresetIndex = appState.filterPresets.findIndex(p => p.name === name);
     if (existingPresetIndex !== -1) {
         if (confirm(`Пресет "${name}" уже существует. Вы хотите заменить его?`)) {
@@ -114,31 +156,34 @@ function saveFilterPreset() {
     // Сохраняем пресеты
     saveFilterPresets();
     
-    // Обновляем выпадающий список пресетов с анимацией
-    modals.filter.presets.innerHTML = '<option value="">Выбрать пресет...</option>';
-    appState.filterPresets.forEach(p => {
-        const option = document.createElement('option');
-        option.value = p.name;
-        option.textContent = p.name;
-        modals.filter.presets.appendChild(option);
-    });
-    
-    // Анимируем выпадающий список
-    $(modals.filter.presets).css({
-        backgroundColor: 'var(--primary-light)',
-        borderColor: 'var(--primary-color)'
-    });
-    
-    setTimeout(() => {
-        $(modals.filter.presets).css({
-            transition: 'background-color 0.5s ease, border-color 0.5s ease',
-            backgroundColor: '',
-            borderColor: ''
+    // Убедимся, что модальное окно фильтра определено и presets существует
+    if (modals.filter && modals.filter.presets) {
+        // Обновляем выпадающий список пресетов с анимацией
+        modals.filter.presets.innerHTML = '<option value="">Выбрать пресет...</option>';
+        appState.filterPresets.forEach(p => {
+            const option = document.createElement('option');
+            option.value = p.name;
+            option.textContent = p.name;
+            modals.filter.presets.appendChild(option);
         });
-    }, 1000);
-    
-    // Выбираем новый пресет
-    modals.filter.presets.value = name;
+        
+        // Анимируем выпадающий список
+        $(modals.filter.presets).css({
+            backgroundColor: 'var(--primary-light)',
+            borderColor: 'var(--primary-color)'
+        });
+        
+        setTimeout(() => {
+            $(modals.filter.presets).css({
+                transition: 'background-color 0.5s ease, border-color 0.5s ease',
+                backgroundColor: '',
+                borderColor: ''
+            });
+        }, 1000);
+        
+        // Выбираем новый пресет
+        modals.filter.presets.value = name;
+    }
     
     // Показываем уведомление
     showToast('success', 'Пресет сохранен', `Пресет "${name}" был успешно сохранен`);
@@ -159,24 +204,42 @@ function saveCurrentSettingsAsPreset() {
     };
     
     // Добавляем все активные фильтры
-    preset.columnFilters = [...appState.activeFilters];
+    if (Array.isArray(appState.activeFilters)) {
+        preset.columnFilters = [...appState.activeFilters];
+    } else {
+        preset.columnFilters = [];
+    }
     
-    // Добавляем все видимые колонки
-    const visibleColumnIndexes = appState.dataTable.columns().visible().toArray();
-    appState.dataTable.columns().header().toArray().forEach((header, index) => {
-        if (visibleColumnIndexes.includes(index)) {
-            const columnName = header.textContent.replace('▼', '').trim();
-            preset.visibleColumns.push(columnName);
-        }
-    });
+    // Добавляем все видимые колонки, если DataTable инициализирована
+    if (appState.dataTable) {
+        const visibleColumnIndexes = appState.dataTable.columns().visible().toArray();
+        appState.dataTable.columns().header().toArray().forEach((header, index) => {
+            if (!header) return;
+            
+            if (visibleColumnIndexes.includes(index)) {
+                const columnName = header.textContent?.replace('▼', '').trim() || '';
+                if (columnName) {
+                    preset.visibleColumns.push(columnName);
+                }
+            }
+        });
+    }
     
     // Добавляем пользовательские колонки
-    preset.customColumns = appState.customColumns.map(col => ({
-        name: col.name,
-        formula: col.formula
-    }));
+    if (Array.isArray(appState.customColumns)) {
+        preset.customColumns = appState.customColumns.map(col => ({
+            name: col.name,
+            formula: col.formula
+        }));
+    } else {
+        preset.customColumns = [];
+    }
     
     // Проверяем, существует ли пресет с таким именем
+    if (!Array.isArray(appState.filterPresets)) {
+        appState.filterPresets = [];
+    }
+    
     const existingPresetIndex = appState.filterPresets.findIndex(p => p.name === name);
     if (existingPresetIndex !== -1) {
         if (confirm(`Пресет "${name}" уже существует. Вы хотите заменить его?`)) {
@@ -192,7 +255,9 @@ function saveCurrentSettingsAsPreset() {
     saveFilterPresets();
     
     // Обновляем модальное окно пресетов
-    initPresetsModal();
+    if (typeof initPresetsModal === 'function') {
+        initPresetsModal();
+    }
     
     // Показываем уведомление
     showToast('success', 'Пресет сохранен', `Текущие настройки сохранены как пресет "${name}"`);
@@ -204,6 +269,11 @@ function saveCurrentSettingsAsPreset() {
  * @returns {Promise<boolean>} - true, если применение успешно
  */
 async function applyFilterPreset(presetName) {
+    if (!Array.isArray(appState.filterPresets)) {
+        console.error('filterPresets не является массивом');
+        return false;
+    }
+    
     const preset = appState.filterPresets.find(p => p.name === presetName);
     if (!preset) return false;
     
@@ -216,65 +286,82 @@ async function applyFilterPreset(presetName) {
         // Очищаем текущие фильтры
         appState.activeFilters = [];
         
-        // Применяем видимость колонок с анимацией
-        if (preset.visibleColumns && preset.visibleColumns.length > 0) {
-            // Сначала скрываем все колонки
-            appState.dataTable.columns().visible(false);
-            
-            // Показываем только видимые колонки с последовательной анимацией
-            appState.dataTable.columns().header().toArray().forEach((header, index) => {
-                const columnName = header.textContent.replace('▼', '').trim();
-                if (preset.visibleColumns.includes(columnName)) {
-                    setTimeout(() => {
-                        appState.dataTable.column(index).visible(true);
-                    }, index * 50); // Задержка для эффекта появления
-                }
-            });
+        // Проверяем, инициализирована ли DataTable
+        if (appState.dataTable) {
+            // Применяем видимость колонок с анимацией
+            if (Array.isArray(preset.visibleColumns) && preset.visibleColumns.length > 0) {
+                // Сначала скрываем все колонки
+                appState.dataTable.columns().visible(false);
+                
+                // Показываем только видимые колонки с последовательной анимацией
+                appState.dataTable.columns().header().toArray().forEach((header, index) => {
+                    if (!header) return;
+                    
+                    const columnName = header.textContent?.replace('▼', '').trim() || '';
+                    if (columnName && preset.visibleColumns.includes(columnName)) {
+                        setTimeout(() => {
+                            appState.dataTable.column(index).visible(true);
+                        }, index * 50); // Задержка для эффекта появления
+                    }
+                });
+            }
         }
         
         // Применяем фильтры
-        if (preset.columnFilters && preset.columnFilters.length > 0) {
+        if (Array.isArray(preset.columnFilters) && preset.columnFilters.length > 0) {
             // Устанавливаем активные фильтры
             appState.activeFilters = preset.columnFilters;
             
-            // Применяем фильтры на сервере
-            await fetchAPI(`/api/filter/${appState.sessionId}`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    filters: appState.activeFilters
-                })
-            });
-            
-            // Перезагружаем данные таблицы с анимацией
-            $('.dataTables_wrapper').css({
-                opacity: 0.5,
-                transform: 'translateY(10px)'
-            });
-            
-            appState.dataTable.ajax.reload(function() {
-                $('.dataTables_wrapper').css({
-                    transition: 'opacity 0.5s ease, transform 0.5s ease',
-                    opacity: 1,
-                    transform: 'translateY(0)'
+            if (appState.sessionId) {
+                // Применяем фильтры на сервере
+                await fetchAPI(`/api/filter/${appState.sessionId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        filters: appState.activeFilters
+                    })
                 });
-            });
+                
+                // Перезагружаем данные таблицы с анимацией, если DataTable инициализирована
+                if (appState.dataTable) {
+                    $('.dataTables_wrapper').css({
+                        opacity: 0.5,
+                        transform: 'translateY(10px)'
+                    });
+                    
+                    appState.dataTable.ajax.reload(function() {
+                        $('.dataTables_wrapper').css({
+                            transition: 'opacity 0.5s ease, transform 0.5s ease',
+                            opacity: 1,
+                            transform: 'translateY(0)'
+                        });
+                    });
+                }
+            }
         }
         
         // Применяем пользовательские колонки
-        if (preset.customColumns && preset.customColumns.length > 0) {
+        if (Array.isArray(preset.customColumns) && preset.customColumns.length > 0) {
             appState.customColumns = preset.customColumns;
             saveCustomColumns();
-            applyCustomColumnsToTable();
+            
+            if (typeof applyCustomColumnsToTable === 'function') {
+                applyCustomColumnsToTable();
+            }
         }
         
         // Удаляем уведомление о загрузке
-        loadingToast.classList.remove('show');
-        setTimeout(() => {
-            toastContainer.removeChild(loadingToast);
-        }, 300);
+        if (loadingToast) {
+            loadingToast.classList.remove('show');
+            setTimeout(() => {
+                const toastContainer = getToastContainer();
+                if (toastContainer.contains(loadingToast)) {
+                    toastContainer.removeChild(loadingToast);
+                }
+            }, 300);
+        }
         
         updateStatusBar(`Применен пресет "${presetName}"`);
         showToast('success', 'Пресет применен', `Успешно применен пресет "${presetName}"`);
@@ -292,9 +379,20 @@ async function applyFilterPreset(presetName) {
  * Инициализировать модальное окно управления пресетами
  */
 function initPresetsModal() {
+    // Проверяем, инициализировано ли модальное окно пресетов
+    if (!modals.presets || !modals.presets.modal) {
+        console.error('Модальное окно пресетов не инициализировано');
+        return;
+    }
+    
     // Очищаем предыдущее содержимое
     modals.presets.presetSelect.innerHTML = '';
     modals.presets.presetInfo.innerHTML = '';
+    
+    // Проверяем, что filterPresets является массивом
+    if (!Array.isArray(appState.filterPresets)) {
+        appState.filterPresets = [];
+    }
     
     // Добавляем опции для каждого пресета с анимацией
     if (appState.filterPresets.length === 0) {
@@ -373,6 +471,15 @@ function initPresetsModal() {
  * @param {string} presetName - Имя пресета для отображения информации
  */
 function updatePresetInfo(presetName) {
+    if (!modals.presets || !modals.presets.presetInfo) {
+        console.error('Элемент информации о пресете не инициализирован');
+        return;
+    }
+    
+    if (!Array.isArray(appState.filterPresets)) {
+        appState.filterPresets = [];
+    }
+    
     const preset = appState.filterPresets.find(p => p.name === presetName);
     if (!preset) {
         modals.presets.presetInfo.innerHTML = 'Пресет не выбран';
@@ -383,17 +490,19 @@ function updatePresetInfo(presetName) {
     modals.presets.presetInfo.style.opacity = '0';
     
     setTimeout(() => {
-        // Генерируем HTML с информацией
+        // Генерируем HTML с информацией с проверками
         let info = `<b>Имя:</b> ${preset.name}<br>`;
-        info += `<b>Видимые колонки:</b> ${preset.visibleColumns ? preset.visibleColumns.length : 0} колонок<br>`;
-        info += `<b>Условия фильтра:</b> ${preset.columnFilters ? preset.columnFilters.length : 0} условий<br>`;
-        info += `<b>Пользовательские колонки:</b> ${preset.customColumns ? preset.customColumns.length : 0} колонок<br>`;
+        info += `<b>Видимые колонки:</b> ${Array.isArray(preset.visibleColumns) ? preset.visibleColumns.length : 0} колонок<br>`;
+        info += `<b>Условия фильтра:</b> ${Array.isArray(preset.columnFilters) ? preset.columnFilters.length : 0} условий<br>`;
+        info += `<b>Пользовательские колонки:</b> ${Array.isArray(preset.customColumns) ? preset.customColumns.length : 0} колонок<br>`;
         
         // Добавляем подробности об условиях фильтра
-        if (preset.columnFilters && preset.columnFilters.length > 0) {
+        if (Array.isArray(preset.columnFilters) && preset.columnFilters.length > 0) {
             info += '<ul>';
             preset.columnFilters.forEach(filter => {
-                info += `<li>${filter.column}: ${filter.values.length} выбранных значений</li>`;
+                if (filter && filter.column && Array.isArray(filter.values)) {
+                    info += `<li>${filter.column}: ${filter.values.length} выбранных значений</li>`;
+                }
             });
             info += '</ul>';
         }
@@ -410,11 +519,22 @@ function updatePresetInfo(presetName) {
  * Переименовать пресет
  */
 function renamePreset() {
+    // Проверяем инициализацию модального окна пресетов
+    if (!modals.presets || !modals.presets.presetSelect) {
+        console.error('Модальное окно пресетов не инициализировано');
+        return;
+    }
+    
     const presetName = modals.presets.presetSelect.value;
     if (!presetName) return;
     
     const newName = prompt('Введите новое имя:', presetName);
     if (!newName || newName === presetName) return;
+    
+    // Проверяем, что filterPresets является массивом
+    if (!Array.isArray(appState.filterPresets)) {
+        appState.filterPresets = [];
+    }
     
     // Проверяем, существует ли имя
     if (appState.filterPresets.some(p => p.name === newName)) {
@@ -430,23 +550,25 @@ function renamePreset() {
         
         // Обновляем элемент выбора с анимацией
         const option = modals.presets.presetSelect.querySelector(`option[value="${presetName}"]`);
-        option.value = newName;
-        option.textContent = newName;
-        modals.presets.presetSelect.value = newName;
-        
-        // Подсвечиваем переименованную опцию
-        $(option).css({
-            backgroundColor: 'var(--primary-light)',
-            color: 'var(--primary-color)'
-        });
-        
-        setTimeout(() => {
+        if (option) {
+            option.value = newName;
+            option.textContent = newName;
+            modals.presets.presetSelect.value = newName;
+            
+            // Подсвечиваем переименованную опцию
             $(option).css({
-                transition: 'background-color 0.5s ease, color 0.5s ease',
-                backgroundColor: '',
-                color: ''
+                backgroundColor: 'var(--primary-light)',
+                color: 'var(--primary-color)'
             });
-        }, 1000);
+            
+            setTimeout(() => {
+                $(option).css({
+                    transition: 'background-color 0.5s ease, color 0.5s ease',
+                    backgroundColor: '',
+                    color: ''
+                });
+            }, 1000);
+        }
         
         // Обновляем информацию
         updatePresetInfo(newName);
@@ -460,10 +582,22 @@ function renamePreset() {
  * Удалить пресет
  */
 function deletePreset() {
+    // Проверяем инициализацию модального окна пресетов
+    if (!modals.presets || !modals.presets.presetSelect) {
+        console.error('Модальное окно пресетов не инициализировано');
+        return;
+    }
+    
     const presetName = modals.presets.presetSelect.value;
     if (!presetName) return;
     
     if (!confirm(`Вы уверены, что хотите удалить пресет "${presetName}"?`)) return;
+    
+    // Проверяем, что filterPresets является массивом
+    if (!Array.isArray(appState.filterPresets)) {
+        appState.filterPresets = [];
+        return;
+    }
     
     // Удаляем пресет
     appState.filterPresets = appState.filterPresets.filter(p => p.name !== presetName);
@@ -502,25 +636,32 @@ async function clearAllFilters() {
             })
         });
         
-        // Перезагружаем данные таблицы с анимацией
-        $('.dataTables_wrapper').css({
-            opacity: 0.5,
-            transform: 'translateY(10px)'
-        });
-        
-        appState.dataTable.ajax.reload(function() {
+        // Перезагружаем данные таблицы с анимацией, если DataTable инициализирована
+        if (appState.dataTable) {
             $('.dataTables_wrapper').css({
-                transition: 'opacity 0.5s ease, transform 0.5s ease',
-                opacity: 1,
-                transform: 'translateY(0)'
+                opacity: 0.5,
+                transform: 'translateY(10px)'
             });
-        });
+            
+            appState.dataTable.ajax.reload(function() {
+                $('.dataTables_wrapper').css({
+                    transition: 'opacity 0.5s ease, transform 0.5s ease',
+                    opacity: 1,
+                    transform: 'translateY(0)'
+                });
+            });
+        }
         
         // Удаляем уведомление о загрузке
-        loadingToast.classList.remove('show');
-        setTimeout(() => {
-            toastContainer.removeChild(loadingToast);
-        }, 300);
+        if (loadingToast) {
+            loadingToast.classList.remove('show');
+            setTimeout(() => {
+                const toastContainer = getToastContainer();
+                if (toastContainer.contains(loadingToast)) {
+                    toastContainer.removeChild(loadingToast);
+                }
+            }, 300);
+        }
         
         updateStatusBar('Все фильтры очищены');
         showToast('success', 'Фильтры очищены', 'Все фильтры были удалены');

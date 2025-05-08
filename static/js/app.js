@@ -7,6 +7,9 @@
  */
 async function initApp() {
     try {
+        // Инициализировать DOM-элементы
+        initDOMElements();
+        
         // Начальное состояние - скрыть таблицу, показать пустое состояние
         const tableWrapper = document.querySelector('.table-wrapper');
         if (tableWrapper) {
@@ -60,6 +63,13 @@ async function initApp() {
 
         // Добавляем кнопку переключения темы (для будущего темного режима)
         createThemeToggle();
+        
+        // Создаем контейнер для уведомлений, если он еще не существует
+        if (!document.querySelector('.toast-container')) {
+            const toastContainer = document.createElement('div');
+            toastContainer.className = 'toast-container';
+            document.body.appendChild(toastContainer);
+        }
         
         // Показываем приветственное уведомление
         setTimeout(() => {

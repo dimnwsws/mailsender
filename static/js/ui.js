@@ -6,94 +6,122 @@
  * Инициализация обработчиков событий
  */
 function initEventListeners() {
-    // Кнопки боковой панели
-    elements.btnMailing.addEventListener('click', () => {
-        loadFile();
-    });
+    // Проверяем, что элементы инициализированы
+    if (!elements) {
+        console.error("Элементы не инициализированы");
+        return;
+    }
     
-    elements.btnViewDb.addEventListener('click', () => {
-        loadFile();
-    });
+    // Кнопки боковой панели
+    if (elements.btnMailing) {
+        elements.btnMailing.addEventListener('click', () => {
+            loadFile();
+        });
+    }
+    
+    if (elements.btnViewDb) {
+        elements.btnViewDb.addEventListener('click', () => {
+            loadFile();
+        });
+    }
 
     // Кнопка "Обновить базу данных"
-    const btnUpdateDb = document.getElementById('btn-update-db');
-    if (btnUpdateDb) {
-        btnUpdateDb.addEventListener('click', () => {
+    if (elements.btnUpdateDb) {
+        elements.btnUpdateDb.addEventListener('click', () => {
             window.open('https://islod.obrnadzor.gov.ru/accredreestr/opendata/', '_blank');
         });
     }
     
     // Кнопки панели инструментов
-    elements.btnLoadFile.addEventListener('click', () => {
-        loadFile();
-    });
+    if (elements.btnLoadFile) {
+        elements.btnLoadFile.addEventListener('click', () => {
+            loadFile();
+        });
+    }
     
-    elements.btnExport.addEventListener('click', () => {
-        initExportModal();
-    });
+    if (elements.btnExport) {
+        elements.btnExport.addEventListener('click', () => {
+            initExportModal();
+        });
+    }
     
-    elements.btnColumns.addEventListener('click', () => {
-        initColumnSelectorModal();
-    });
+    if (elements.btnColumns) {
+        elements.btnColumns.addEventListener('click', () => {
+            initColumnSelectorModal();
+        });
+    }
     
-    elements.btnCustomColumns.addEventListener('click', () => {
-        initCustomColumnsModal();
-    });
+    if (elements.btnCustomColumns) {
+        elements.btnCustomColumns.addEventListener('click', () => {
+            initCustomColumnsModal();
+        });
+    }
     
-    elements.btnPresets.addEventListener('click', () => {
-        initPresetsModal();
-    });
+    if (elements.btnPresets) {
+        elements.btnPresets.addEventListener('click', () => {
+            initPresetsModal();
+        });
+    }
     
     // Изменение файлового ввода
-    elements.fileInput.addEventListener('change', (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            handleFileUpload(file);
-        }
-    });
+    if (elements.fileInput) {
+        elements.fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                handleFileUpload(file);
+            }
+        });
+    }
     
     // Глобальный поиск
-    elements.globalSearch.addEventListener('input', () => {
-        // Сначала используем стандартный поиск DataTables для всего содержимого
-        if (appState.dataTable) {
-            appState.dataTable.search(elements.globalSearch.value).draw(false);
-            
-            // Затем применяем наш пользовательский поиск и подсветку колонок
-            searchColumns(elements.globalSearch.value);
-        }
-    });
-    
-    // Предотвращаем поведение по умолчанию для формы
-    elements.globalSearch.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-        }
-    });
+    if (elements.globalSearch) {
+        elements.globalSearch.addEventListener('input', () => {
+            // Сначала используем стандартный поиск DataTables для всего содержимого
+            if (appState.dataTable) {
+                appState.dataTable.search(elements.globalSearch.value).draw(false);
+                
+                // Затем применяем наш пользовательский поиск и подсветку колонок
+                searchColumns(elements.globalSearch.value);
+            }
+        });
+        
+        // Предотвращаем поведение по умолчанию для формы
+        elements.globalSearch.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+            }
+        });
+    }
     
     // Кнопка загрузки в пустом состоянии
     const btnStartUpload = document.getElementById('btn-start-upload');
     if (btnStartUpload) {
         btnStartUpload.addEventListener('click', function() {
-            // Вызываем клик по файловому вводу
-            document.getElementById('file-input').click();
+            // Вызываем клик по файловому вводу, если он существует
+            const fileInput = document.getElementById('file-input');
+            if (fileInput) {
+                fileInput.click();
+            } else {
+                showToast('error', 'Ошибка', 'Элемент ввода файла не найден');
+            }
         });
     }
     
     // Закрытие модальных окон при клике вне
     window.addEventListener('click', (event) => {
-        if (event.target === modals.columnSelector.modal) {
+        if (modals.columnSelector && modals.columnSelector.modal && event.target === modals.columnSelector.modal) {
             closeModal(modals.columnSelector.modal);
         }
-        if (event.target === modals.filter.modal) {
+        if (modals.filter && modals.filter.modal && event.target === modals.filter.modal) {
             closeModal(modals.filter.modal);
         }
-        if (event.target === modals.presets.modal) {
+        if (modals.presets && modals.presets.modal && event.target === modals.presets.modal) {
             closeModal(modals.presets.modal);
         }
-        if (event.target === modals.export.modal) {
+        if (modals.export && modals.export.modal && event.target === modals.export.modal) {
             closeModal(modals.export.modal);
         }
-        if (event.target === modals.customColumns.modal) {
+        if (modals.customColumns && modals.customColumns.modal && event.target === modals.customColumns.modal) {
             closeModal(modals.customColumns.modal);
         }
     });
@@ -102,19 +130,24 @@ function initEventListeners() {
     document.addEventListener('keydown', (e) => {
         // Escape закрывает модальные окна
         if (e.key === 'Escape') {
-            if (modals.columnSelector.modal.style.display !== 'none') {
+            if (modals.columnSelector && modals.columnSelector.modal && 
+                modals.columnSelector.modal.style.display !== 'none') {
                 closeModal(modals.columnSelector.modal);
             }
-            if (modals.filter.modal.style.display !== 'none') {
+            if (modals.filter && modals.filter.modal && 
+                modals.filter.modal.style.display !== 'none') {
                 closeModal(modals.filter.modal);
             }
-            if (modals.presets.modal.style.display !== 'none') {
+            if (modals.presets && modals.presets.modal && 
+                modals.presets.modal.style.display !== 'none') {
                 closeModal(modals.presets.modal);
             }
-            if (modals.export.modal.style.display !== 'none') {
+            if (modals.export && modals.export.modal && 
+                modals.export.modal.style.display !== 'none') {
                 closeModal(modals.export.modal);
             }
-            if (modals.customColumns.modal.style.display !== 'none') {
+            if (modals.customColumns && modals.customColumns.modal && 
+                modals.customColumns.modal.style.display !== 'none') {
                 closeModal(modals.customColumns.modal);
             }
         }
@@ -122,14 +155,16 @@ function initEventListeners() {
         // Ctrl+F фокусирует поле поиска
         if (e.ctrlKey && e.key === 'f') {
             e.preventDefault();
-            elements.globalSearch.focus();
+            if (elements.globalSearch) {
+                elements.globalSearch.focus();
+            }
         }
     });
     
     // Добавляем клавиатурную навигацию для результатов поиска
     document.addEventListener('keydown', (e) => {
         // Только если у нас есть совпадения и поле поиска в фокусе
-        if (document.activeElement === elements.globalSearch && 
+        if (elements.globalSearch && document.activeElement === elements.globalSearch && 
             appState.dataTable && 
             elements.globalSearch.value.trim() !== '') {
             
@@ -178,39 +213,48 @@ function initEventListeners() {
                 const $headerRow = $(bestHeader).closest('tr');
                 const $headerContainer = $headerRow.closest('.dataTables_scrollHead');
                 
-                $headerContainer.animate({
-                    scrollLeft: $(bestHeader).offset().left - $headerContainer.offset().left + 
-                            $headerContainer.scrollLeft() - ($headerContainer.width() / 2)
-                }, 300);
+                if ($headerContainer.length) {
+                    $headerContainer.animate({
+                        scrollLeft: $(bestHeader).offset().left - $headerContainer.offset().left + 
+                                $headerContainer.scrollLeft() - ($headerContainer.width() / 2)
+                    }, 300);
+                }
             }
         }
     });
     
     // Добавляем функциональность перетаскивания файлов для загрузки
     const tableContainer = document.querySelector('.table-container');
-    tableContainer.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        tableContainer.classList.add('dragover');
-    });
-    
-    tableContainer.addEventListener('dragleave', () => {
-        tableContainer.classList.remove('dragover');
-    });
-    
-    tableContainer.addEventListener('drop', (e) => {
-        e.preventDefault();
-        tableContainer.classList.remove('dragover');
+    if (tableContainer) {
+        tableContainer.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            tableContainer.classList.add('dragover');
+        });
         
-        if (e.dataTransfer.files.length) {
-            handleFileUpload(e.dataTransfer.files[0]);
-        }
-    });
+        tableContainer.addEventListener('dragleave', () => {
+            tableContainer.classList.remove('dragover');
+        });
+        
+        tableContainer.addEventListener('drop', (e) => {
+            e.preventDefault();
+            tableContainer.classList.remove('dragover');
+            
+            if (e.dataTransfer.files.length) {
+                handleFileUpload(e.dataTransfer.files[0]);
+            }
+        });
+    }
 }
 
 /**
  * Создать кнопку переключения темы (для будущего темного режима)
  */
 function createThemeToggle() {
+    // Проверяем, существует ли уже кнопка
+    if (document.querySelector('.theme-toggle')) {
+        return;
+    }
+    
     const themeToggle = document.createElement('div');
     themeToggle.className = 'theme-toggle';
     themeToggle.innerHTML = `
@@ -229,7 +273,7 @@ function createThemeToggle() {
     
     document.body.appendChild(themeToggle);
     
-    // TODO: Реализовать функциональность переключения темы
+    // Реализуем функциональность переключения темы
     themeToggle.addEventListener('click', () => {
         showToast('info', 'Скоро', 'Темный режим будет доступен в будущем обновлении');
     });
@@ -239,7 +283,11 @@ function createThemeToggle() {
  * Триггер клика по файловому вводу
  */
 function loadFile() {
-    elements.fileInput.click();
+    if (elements.fileInput) {
+        elements.fileInput.click();
+    } else {
+        showToast('error', 'Ошибка', 'Элемент ввода файла не найден');
+    }
 }
 
 /**
@@ -267,17 +315,22 @@ async function handleFileUpload(file) {
         });
         
         if (!response.ok) {
-            const errorText = await response.text();
+            let errorText = await response.text();
             throw new Error(`Загрузка не удалась: ${errorText}`);
         }
         
         const data = await response.json();
         
         // Удаляем уведомление о загрузке
-        loadingToast.classList.remove('show');
-        setTimeout(() => {
-            toastContainer.removeChild(loadingToast);
-        }, 300);
+        if (loadingToast) {
+            loadingToast.classList.remove('show');
+            setTimeout(() => {
+                const toastContainer = getToastContainer();
+                if (toastContainer.contains(loadingToast)) {
+                    toastContainer.removeChild(loadingToast);
+                }
+            }, 300);
+        }
         
         // Сохраняем ID сессии и данные
         appState.sessionId = data.session_id;
